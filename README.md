@@ -1,22 +1,31 @@
 # dev-security-hooks
 
-Bootstrap local pre-commit security scanning (Gitleaks + Semgrep) in any git repo. macOS and Linux.
+Self-serve security setup for any git repo. macOS and Linux.
 
-## Quick start
+Two independent setups inside this repo — install one, both, or neither:
 
-In any git repo:
+| What | Why | Pinned URL |
+|---|---|---|
+| [Local pre-commit scanning](#1-local-pre-commit-scanning-gitleaks--semgrep) | Block secrets + ERROR-severity SAST findings before they leave your machine. | `v1.1.0` |
+| [GPG commit signing](#2-gpg-commit-signing) | Get the GitHub "Verified" badge on every commit; satisfies signed-commit branch protection. | `v1.1.0` |
+
+---
+
+## 1. Local pre-commit scanning (Gitleaks + Semgrep)
+
+### Quick start (any repo)
 
 ```bash
 mkdir -p scripts
-curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.0.0/install-security-hooks.sh \
+curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.1.0/install-security-hooks.sh \
   -o scripts/install-security-hooks.sh
 chmod +x scripts/install-security-hooks.sh
 bash scripts/install-security-hooks.sh
 ```
 
-That's it. The installer detects your OS and package manager (brew → pipx → pip3), installs `pre-commit`, `gitleaks`, and `semgrep` as needed, writes the configs, registers commit/push/post-merge hooks, and adds the configs to `.gitignore` so each developer bootstraps their own.
+The installer detects your OS and package manager (brew → pipx → pip3), installs `pre-commit`, `gitleaks`, and `semgrep` as needed, writes the configs, registers commit/push/post-merge hooks, and adds the configs to `.gitignore` (per-developer setup).
 
-## What you get
+### What you get
 
 | Stage | Tool | Behavior |
 |---|---|---|
@@ -26,29 +35,57 @@ That's it. The installer detects your OS and package manager (brew → pipx → 
 
 Semgrep registry rules cover JavaScript, TypeScript, Node.js, NestJS, Next.js, Fastify, React, PHP, Docker, plus generic security-audit and OWASP Top 10. Gitleaks uses its default ruleset plus an allowlist for `.env.example` and similar placeholders.
 
-## With Claude Code
+### With Claude Code
 
-Open a Claude Code session in any repo and tell it:
+> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.1.0/setup-security-hooks.md to set up local security scanning here.
 
-> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.0.0/setup-security-hooks.md to set up local security scanning here.
-
-Claude reads the doc, installs the tools, writes the configs, registers the hooks, and prints a summary. Useful when you want one of your existing repos onboarded without running shell commands yourself.
-
-## Manual commands once installed
+### Manual commands once installed
 
 ```bash
-pre-commit run --all-files                    # scan entire repo
+pre-commit run --all-files                            # scan entire repo
 pre-commit run --hook-stage pre-push --all-files
 gitleaks detect --source . --redact --verbose
 semgrep scan --metrics=off --config=auto
-pre-commit autoupdate                         # update hook revisions
-git commit --no-verify                        # bypass (emergencies only)
+pre-commit autoupdate                                 # update hook revisions
+git commit --no-verify                                # bypass (emergencies only)
 ```
+
+---
+
+## 2. GPG commit signing
+
+For the GitHub **Verified** badge and to satisfy signed-commit branch protection.
+
+### With Claude Code (recommended)
+
+Open Claude Code on your machine and say:
+
+> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.1.0/setup-gpg-signing.md to set up GPG commit signing.
+
+Claude installs GnuPG + pinentry, configures gpg-agent for IDE-friendly passphrase prompts, walks you through key generation, writes the git config (asking whether you want it **global** or **scoped to a directory** — pick scoped if you commit as different identities for personal projects vs work), and helps you upload the public key to GitHub.
+
+### Manual / no-Claude path
+
+Read [`setup-gpg-signing.md`](./setup-gpg-signing.md) and follow the "What Claude should do" checklist yourself. It's a plain step-by-step.
+
+### What you get
+
+- A 4096-bit RSA GPG key, 1-year expiry (rotate yearly).
+- `commit.gpgsign = true` either globally or scoped to a directory of your choice via `includeIf` (the scoped option leaves your other repos untouched).
+- pinentry configured so passphrase prompts work from terminal **and** IDEs (VS Code, JetBrains).
+- Public key uploaded to GitHub.
+
+---
 
 ## Files
 
-- [`install-security-hooks.sh`](./install-security-hooks.sh) — the installer (self-contained; configs embedded as heredocs)
-- [`setup-security-hooks.md`](./setup-security-hooks.md) — Claude Code instruction doc (full file contents + step-by-step)
+- [`install-security-hooks.sh`](./install-security-hooks.sh) — self-contained installer for the pre-commit setup (configs embedded as heredocs).
+- [`setup-security-hooks.md`](./setup-security-hooks.md) — Claude Code instruction doc for the pre-commit setup.
+- [`setup-gpg-signing.md`](./setup-gpg-signing.md) — Claude Code instruction doc for GPG commit signing.
+
+## Releases
+
+Pinned URLs use a git tag for tamper-resistance. Always reference the latest tag in the table at the top of this README. Current: **v1.1.0**.
 
 ## License
 
