@@ -8,7 +8,7 @@ In any git repo:
 
 ```bash
 mkdir -p scripts
-curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/main/install-security-hooks.sh \
+curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.0.0/install-security-hooks.sh \
   -o scripts/install-security-hooks.sh
 chmod +x scripts/install-security-hooks.sh
 bash scripts/install-security-hooks.sh
@@ -30,7 +30,7 @@ Semgrep registry rules cover JavaScript, TypeScript, Node.js, NestJS, Next.js, F
 
 Open a Claude Code session in any repo and tell it:
 
-> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/main/setup-security-hooks.md to set up local security scanning here.
+> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.0.0/setup-security-hooks.md to set up local security scanning here.
 
 Claude reads the doc, installs the tools, writes the configs, registers the hooks, and prints a summary. Useful when you want one of your existing repos onboarded without running shell commands yourself.
 
