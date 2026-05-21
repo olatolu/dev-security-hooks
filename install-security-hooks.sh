@@ -106,6 +106,27 @@ else
   ok "gitleaks installed: $(gitleaks version)"
 fi
 
+# ---------- yara (advisory layer — community malware signatures) ----------
+if [ "${SKIP_YARA:-0}" = "1" ]; then
+  warn "Skipping YARA install (SKIP_YARA=1)"
+elif command -v yara >/dev/null 2>&1; then
+  ok "yara already installed: $(yara --version)"
+else
+  info "Installing yara..."
+  if [ "$HAS_BREW" = 1 ]; then
+    brew install yara
+  elif command -v apt >/dev/null 2>&1; then
+    sudo apt update && sudo apt install -y yara
+  elif command -v dnf >/dev/null 2>&1; then
+    sudo dnf install -y yara
+  elif command -v pacman >/dev/null 2>&1; then
+    sudo pacman -S --needed yara
+  else
+    warn "Could not install yara automatically; install manually and rerun (or set SKIP_YARA=1)"
+  fi
+  command -v yara >/dev/null 2>&1 && ok "yara installed: $(yara --version)"
+fi
+
 # ---------- write config files (only if missing) ----------
 write_if_missing() {
   local path="$1"
@@ -170,6 +191,13 @@ repos:
         language: system
         types_or: [javascript, jsx, ts, tsx, php, yaml, json, dockerfile]
         stages: [pre-commit]
+
+      - id: yara-staged
+        name: yara (community malware signatures, advisory)
+        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; command -v yara >/dev/null 2>&1 || exit 0; [ -f .yara-rules/_aggregate.yar ] || exit 0; for f in "$@"; do [ -f "$f" ] || continue; out=$(yara -w -d filename="$f" -d filepath="$f" -d extension="${f##*.}" -d filetype="" -d owner="" .yara-rules/_aggregate.yar "$f" 2>/dev/null || true); if [ -n "$out" ]; then echo "[advisory] YARA match in $f --"; echo "$out"; fi; done; exit 0' --
+        language: system
+        stages: [pre-commit]
+        verbose: true
 
       # ---------- pre-push stage: upstream..HEAD diff, blocking ----------
       - id: gitleaks-prepush
@@ -342,6 +370,36 @@ rules:
         - "*.ts"
 SEMGREP_RULES_EOF
 
+# ---------- YARA community ruleset (Florian Roth signature-base) ----------
+if [ "${SKIP_YARA:-0}" = "1" ]; then
+  warn "Skipping YARA rules setup (SKIP_YARA=1)"
+elif ! command -v yara >/dev/null 2>&1; then
+  warn "yara not on PATH; skipping rules clone. Re-run installer after installing yara."
+else
+  if [ -d .yara-rules/.git ]; then
+    ok "Keeping existing .yara-rules clone (run 'cd .yara-rules && git pull' to update community rules)"
+  else
+    info "Cloning Florian Roth signature-base community rules into .yara-rules/ (shallow, ~12MB)..."
+    git clone --depth 1 --quiet https://github.com/Neo23x0/signature-base.git .yara-rules
+    ok "Cloned signature-base ($(find .yara-rules/yara -name '*.yar' 2>/dev/null | wc -l | tr -d ' ') rules)"
+  fi
+  if [ ! -f .yara-rules/_aggregate.yar ] || [ .yara-rules/yara -nt .yara-rules/_aggregate.yar ]; then
+    info "Generating YARA aggregate (testing each rule file for compile, dropping broken ones)..."
+    AGG=".yara-rules/_aggregate.yar"
+    : > "$AGG"
+    skipped=0; included=0
+    for f in $(find .yara-rules/yara -name '*.yar' 2>/dev/null | sort); do
+      if yara -w -d filename="" -d filepath="" -d extension="" -d filetype="" -d owner="" "$f" /dev/null >/dev/null 2>&1; then
+        printf 'include "%s"\n' "$(realpath "$f")" >> "$AGG"
+        included=$((included+1))
+      else
+        skipped=$((skipped+1))
+      fi
+    done
+    ok "Aggregate built ($included rules included, $skipped skipped due to compile errors)"
+  fi
+fi
+
 # ---------- add generated files to .gitignore (per-developer setup) ----------
 ensure_gitignore_entries() {
   local ignore=".gitignore"
@@ -361,6 +419,7 @@ ensure_gitignore_entries() {
 .semgrepignore
 .gitleaks.toml
 .semgrep-rules/
+.yara-rules/
 scripts/install-security-hooks.sh
 GITIGNORE_EOF
   ok "Added security-tooling entries to .gitignore"

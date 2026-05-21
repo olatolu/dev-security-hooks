@@ -6,8 +6,8 @@ Two independent setups inside this repo — install one, both, or neither:
 
 | What | Why | Pinned URL |
 |---|---|---|
-| [Local pre-commit scanning](#1-local-pre-commit-scanning-gitleaks--semgrep) | Block secrets + ERROR-severity SAST findings before they leave your machine. | `v1.2.1` |
-| [GPG commit signing](#2-gpg-commit-signing) | Get the GitHub "Verified" badge on every commit; satisfies signed-commit branch protection. | `v1.2.1` |
+| [Local pre-commit scanning](#1-local-pre-commit-scanning-gitleaks--semgrep) | Block secrets + ERROR-severity SAST findings before they leave your machine. | `v1.3.0` |
+| [GPG commit signing](#2-gpg-commit-signing) | Get the GitHub "Verified" badge on every commit; satisfies signed-commit branch protection. | `v1.3.0` |
 
 ---
 
@@ -17,7 +17,7 @@ Two independent setups inside this repo — install one, both, or neither:
 
 ```bash
 mkdir -p scripts
-curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.2.1/install-security-hooks.sh \
+curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.0/install-security-hooks.sh \
   -o scripts/install-security-hooks.sh
 chmod +x scripts/install-security-hooks.sh
 bash scripts/install-security-hooks.sh
@@ -37,9 +37,11 @@ Semgrep registry rules cover JavaScript, TypeScript, Node.js, NestJS, Next.js, F
 
 **Custom malware-loader detection** (added in v1.2.1): catches DEV#POPPER-family payloads that inject obfuscated JavaScript into config files (`jest.config.js`, `postcss.config.mjs`, etc.). Layered defense — Gitleaks signature rules, a Semgrep YAML rule pack, and a long-line check on config files (anything >500 chars in a `*.config.{js,mjs,cjs,ts}` blocks). Standard registry rules don't catch this; the custom layer does.
 
+**YARA community feed** (added in v1.3.0): a fourth detection layer that pulls in [Florian Roth's `signature-base`](https://github.com/Neo23x0/signature-base) — ~700 community-maintained YARA rules covering known malware families. Runs at `pre-commit` stage as **advisory only** (won't block commits — false positives on legitimate crypto libraries and test fixtures are expected). Useful for catching variants and previously-unseen families that don't have explicit Gitleaks/Semgrep rules. Update community rules anytime with `cd .yara-rules && git pull && cd .. && bash scripts/install-security-hooks.sh`. Set `SKIP_YARA=1` before running the installer to opt out (~12MB rule clone + occasional FPs aren't for everyone).
+
 ### With Claude Code
 
-> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.2.1/setup-security-hooks.md to set up local security scanning here.
+> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.0/setup-security-hooks.md to set up local security scanning here.
 
 ### Manual commands once installed
 
@@ -62,7 +64,7 @@ For the GitHub **Verified** badge and to satisfy signed-commit branch protection
 
 Open Claude Code on your machine and say:
 
-> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.2.1/setup-gpg-signing.md to set up GPG commit signing.
+> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.0/setup-gpg-signing.md to set up GPG commit signing.
 
 Claude installs GnuPG + pinentry, configures gpg-agent for IDE-friendly passphrase prompts, walks you through key generation, writes the git config (asking whether you want it **global** or **scoped to a directory** — pick scoped if you commit as different identities for personal projects vs work), and helps you upload the public key to GitHub.
 
@@ -87,13 +89,14 @@ Read [`setup-gpg-signing.md`](./setup-gpg-signing.md) and follow the "What Claud
 
 ## Releases
 
-Pinned URLs use a git tag for tamper-resistance. Always reference the latest tag in the table at the top of this README. Current: **v1.2.1**.
+Pinned URLs use a git tag for tamper-resistance. Always reference the latest tag in the table at the top of this README. Current: **v1.3.0**.
 
 **Upgrading from an older version:** because the installer is idempotent and preserves existing configs, an in-place re-run won't pick up new rules. To upgrade, delete the locally-installed configs and re-run:
 
 ```bash
 rm -f .pre-commit-config.yaml .semgrepignore .gitleaks.toml
 rm -rf .semgrep-rules
+# (leave .yara-rules/ alone — it's a git submodule-style clone, gets re-used by installer)
 bash scripts/install-security-hooks.sh
 ```
 

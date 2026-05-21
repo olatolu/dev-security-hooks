@@ -23,6 +23,8 @@ Installs a fast, local, developer-friendly security gate that runs on every `git
 
 Any single signal blocks the commit. False positives are unlikely because each signal is highly distinctive; if one does fire in a legitimate file, allowlist that specific path in `.gitleaks.toml` (gitleaks rule's `paths` field) or add the rule's id under `paths.include` exclusions in `.semgrep-rules/dev-popper.yaml`.
 
+**YARA community feed (added v1.3.0):** A fourth detection layer pulls in [Florian Roth's `signature-base`](https://github.com/Neo23x0/signature-base) — ~700 community-maintained YARA rules covering known malware families (RATs, miners, supply-chain loaders, packers). Runs **advisory only** at pre-commit (matches log but don't block) because the community ruleset has occasional false positives on legitimate crypto libraries and test fixtures. Useful for catching new variants and previously-unseen families that don't have explicit hand-rolled signatures yet. Set `SKIP_YARA=1` before running the installer to opt out (e.g. on a teammate's machine that doesn't want the ~12MB rules clone). Update community rules anytime with `cd .yara-rules && git pull && cd .. && bash scripts/install-security-hooks.sh`.
+
 ---
 
 ## What Claude should do
