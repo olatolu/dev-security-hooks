@@ -159,7 +159,7 @@ repos:
 
       - id: check-config-long-lines
         name: long-line check on config files (DEV#POPPER sniffer)
-        entry: bash -c 'rc=0; for f in "$@"; do [ -f "$f" ] || continue; max=$(awk "{ if (length>max) max=length } END { print max+0 }" "$f"); if [ "$max" -gt 500 ]; then echo "ERROR: $f has a $max-char line (limit 500). Config files should never have lines this long — possible malware payload (DEV#POPPER family)."; rc=1; fi; done; exit $rc' --
+        entry: bash -c 'rc=0; for f in "$@"; do [ -f "$f" ] || continue; max=$(awk "{ if (length>max) max=length } END { print max+0 }" "$f"); if [ "$max" -gt 500 ]; then echo "[ERROR] $f has a $max-char line (limit 500). Config files should never have lines this long — possible malware payload (DEV#POPPER family)."; rc=1; fi; done; exit $rc' --
         language: system
         files: '(^|/)([a-z][a-z0-9-]*\.)?config\.(js|mjs|cjs|ts)$|(^|/)(jest|postcss|tailwind|next|webpack|babel|rollup|vite|eslint|prettier)\.config\.[a-z]+$'
         stages: [pre-commit]
