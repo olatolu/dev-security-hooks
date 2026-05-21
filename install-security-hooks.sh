@@ -157,9 +157,16 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      - id: check-config-long-lines
+        name: long-line check on config files (DEV#POPPER sniffer)
+        entry: bash -c 'rc=0; for f in "$@"; do [ -f "$f" ] || continue; max=$(awk "{ if (length>max) max=length } END { print max+0 }" "$f"); if [ "$max" -gt 500 ]; then echo "ERROR: $f has a $max-char line (limit 500). Config files should never have lines this long — possible malware payload (DEV#POPPER family)."; rc=1; fi; done; exit $rc' --
+        language: system
+        files: '(^|/)([a-z][a-z0-9-]*\.)?config\.(js|mjs|cjs|ts)$|(^|/)(jest|postcss|tailwind|next|webpack|babel|rollup|vite|eslint|prettier)\.config\.[a-z]+$'
+        stages: [pre-commit]
+
       - id: semgrep-staged
         name: semgrep (staged files, ERROR blocks)
-        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; exec semgrep scan --error --severity=ERROR --metrics=off --quiet --config=p/secrets --config=p/security-audit --config=p/owasp-top-ten --config=p/javascript --config=p/typescript --config=p/nodejs --config=p/nodejsscan --config=p/react --config=p/nextjs --config=p/php --config=p/docker "$@"' --
+        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; exec semgrep scan --error --severity=ERROR --metrics=off --quiet --config=p/secrets --config=p/security-audit --config=p/owasp-top-ten --config=p/javascript --config=p/typescript --config=p/nodejs --config=p/nodejsscan --config=p/react --config=p/nextjs --config=p/php --config=p/docker --config=.semgrep-rules/dev-popper.yaml "$@"' --
         language: system
         types_or: [javascript, jsx, ts, tsx, php, yaml, json, dockerfile]
         stages: [pre-commit]
@@ -175,7 +182,7 @@ repos:
 
       - id: semgrep-prepush
         name: semgrep (upstream..HEAD, ERROR blocks)
-        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; set -e; if ! git rev-parse "@{upstream}" >/dev/null 2>&1; then range="HEAD~1..HEAD"; else range="@{upstream}..HEAD"; fi; files=$(git diff --name-only --diff-filter=ACMR "$range" 2>/dev/null || true); if [ -z "$files" ]; then echo "no changed files to scan"; exit 0; fi; printf "%s\n" "$files" | tr "\n" "\0" | xargs -0 semgrep scan --error --severity=ERROR --metrics=off --quiet --config=p/secrets --config=p/security-audit --config=p/owasp-top-ten --config=p/javascript --config=p/typescript --config=p/nodejs --config=p/nodejsscan --config=p/react --config=p/nextjs --config=p/php --config=p/docker'
+        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; set -e; if ! git rev-parse "@{upstream}" >/dev/null 2>&1; then range="HEAD~1..HEAD"; else range="@{upstream}..HEAD"; fi; files=$(git diff --name-only --diff-filter=ACMR "$range" 2>/dev/null || true); if [ -z "$files" ]; then echo "no changed files to scan"; exit 0; fi; printf "%s\n" "$files" | tr "\n" "\0" | xargs -0 semgrep scan --error --severity=ERROR --metrics=off --quiet --config=p/secrets --config=p/security-audit --config=p/owasp-top-ten --config=p/javascript --config=p/typescript --config=p/nodejs --config=p/nodejsscan --config=p/react --config=p/nextjs --config=p/php --config=p/docker --config=.semgrep-rules/dev-popper.yaml'
         language: system
         pass_filenames: false
         always_run: true
@@ -193,7 +200,7 @@ repos:
 
       - id: semgrep-postmerge
         name: semgrep (post-merge advisory)
-        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; files=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD 2>/dev/null || true); if [ -z "$files" ]; then exit 0; fi; echo "[advisory] scanning merged files with semgrep..."; printf "%s\n" "$files" | tr "\n" "\0" | xargs -0 semgrep scan --severity=ERROR --metrics=off --quiet --config=p/security-audit --config=p/owasp-top-ten --config=p/javascript --config=p/typescript --config=p/nodejs --config=p/php --config=p/docker || true'
+        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; files=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD 2>/dev/null || true); if [ -z "$files" ]; then exit 0; fi; echo "[advisory] scanning merged files with semgrep..."; printf "%s\n" "$files" | tr "\n" "\0" | xargs -0 semgrep scan --severity=ERROR --metrics=off --quiet --config=p/security-audit --config=p/owasp-top-ten --config=p/javascript --config=p/typescript --config=p/nodejs --config=p/php --config=p/docker --config=.semgrep-rules/dev-popper.yaml || true'
         language: system
         pass_filenames: false
         always_run: true
@@ -251,7 +258,89 @@ paths = [
   '''(^|/)docs/''',
   '''(^|/)attached_assets/''',
 ]
+
+# ----- Custom malware-signature rules (DEV#POPPER family) -----
+# Triggered by patterns observed in real injections into config files (jest, postcss, eslint).
+# Any single match blocks the commit. None of these patterns occur in legitimate config files.
+
+[[rules]]
+id = "dev-popper-global-bang"
+description = "DEV#POPPER malware loader: global['<single-special-char>']=<id> pollution"
+regex = '''global\s*\[\s*['"][!#@$%^&*]['"]\s*\]\s*=\s*['"][0-9-]+['"]'''
+keywords = ["global"]
+
+[[rules]]
+id = "dev-popper-fromcharcode-del"
+description = "DEV#POPPER malware loader: String.fromCharCode(127) — DEL character as payload separator"
+regex = '''String\.fromCharCode\s*\(\s*127\s*\)'''
+keywords = ["fromCharCode"]
+
+[[rules]]
+id = "dev-popper-mangled-var"
+description = "DEV#POPPER malware loader: _$_<hex> obfuscated variable signature"
+regex = '''var\s+_\$_[0-9a-f]{4,}\s*='''
+keywords = ["_$_"]
+
+[[rules]]
+id = "dev-popper-shuffler-iife"
+description = "DEV#POPPER malware loader: character-shuffler IIFE signature"
+regex = '''=\s*\(function\s*\(\s*l\s*,\s*e\s*\)\s*\{\s*var\s+\w+\s*=\s*l\.length'''
+keywords = ["function(l,e)"]
 GITLEAKS_EOF
+
+write_if_missing ".semgrep-rules/dev-popper.yaml" <<'SEMGREP_RULES_EOF'
+# Custom Semgrep rules: DEV#POPPER-family malware loader signatures.
+# Triggered by patterns observed in real injections into config files (jest, postcss, eslint).
+# All ERROR-severity — block at the gate.
+rules:
+  - id: dev-popper-global-bang-pollution
+    languages: [generic]
+    message: "DEV#POPPER-family malware loader: global['<single-special-char>']=<id> pollution pattern"
+    severity: ERROR
+    pattern-regex: 'global\s*\[\s*[''"][!#@$%^&*][''"]\s*\]\s*=\s*[''"][0-9-]+[''"]'
+    paths:
+      include:
+        - "*.js"
+        - "*.mjs"
+        - "*.cjs"
+        - "*.ts"
+
+  - id: dev-popper-fromcharcode-127
+    languages: [generic]
+    message: "DEV#POPPER-family malware loader: String.fromCharCode(127) — DEL character used as payload separator"
+    severity: ERROR
+    pattern-regex: 'String\.fromCharCode\s*\(\s*127\s*\)'
+    paths:
+      include:
+        - "*.js"
+        - "*.mjs"
+        - "*.cjs"
+        - "*.ts"
+
+  - id: dev-popper-mangled-var
+    languages: [generic]
+    message: "DEV#POPPER-family malware loader: _$_<hex> obfuscated variable signature"
+    severity: ERROR
+    pattern-regex: 'var\s+_\$_[0-9a-f]{4,}\s*='
+    paths:
+      include:
+        - "*.js"
+        - "*.mjs"
+        - "*.cjs"
+        - "*.ts"
+
+  - id: dev-popper-shuffler-iife
+    languages: [generic]
+    message: "DEV#POPPER-family malware loader: character-shuffler IIFE signature"
+    severity: ERROR
+    pattern-regex: '=\s*\(function\s*\(\s*l\s*,\s*e\s*\)\s*\{\s*var\s+\w+\s*=\s*l\.length'
+    paths:
+      include:
+        - "*.js"
+        - "*.mjs"
+        - "*.cjs"
+        - "*.ts"
+SEMGREP_RULES_EOF
 
 # ---------- add generated files to .gitignore (per-developer setup) ----------
 ensure_gitignore_entries() {
@@ -271,6 +360,7 @@ ensure_gitignore_entries() {
 .pre-commit-config.yaml
 .semgrepignore
 .gitleaks.toml
+.semgrep-rules/
 scripts/install-security-hooks.sh
 GITIGNORE_EOF
   ok "Added security-tooling entries to .gitignore"

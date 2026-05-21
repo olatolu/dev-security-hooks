@@ -15,6 +15,14 @@ Installs a fast, local, developer-friendly security gate that runs on every `git
 
 **Coverage:** JavaScript, TypeScript, Node.js, NestJS, Next.js, Fastify, React, PHP, Docker. (Laravel patterns are caught via `p/php` + `p/security-audit`; YAML files are syntax-checked by `pre-commit/pre-commit-hooks` `check-yaml` since there is no public Semgrep YAML ruleset.)
 
+**Custom malware-loader layer (added v1.2.0):** Standard Semgrep/Gitleaks rules miss DEV#POPPER-family payloads that inject obfuscated JavaScript into config files — the attacker tuned the payload to evade them. This setup adds three orthogonal signals that the loader trips but normal config files don't:
+
+- **Long-line check** on `*.config.{js,mjs,cjs,ts}` — config files should never have a single line >500 chars. The infected `postcss.config.mjs` we caught had a 5312-char line.
+- **Custom Gitleaks rules** matching signature strings: `global['!']=<id>`, `String.fromCharCode(127)`, `_$_<hex>` variable names, character-shuffler IIFE.
+- **Custom Semgrep YAML rules** (`.semgrep-rules/dev-popper.yaml`) — same signatures at ERROR severity, blocking.
+
+Any single signal blocks the commit. False positives are unlikely because each signal is highly distinctive; if one does fire in a legitimate file, allowlist that specific path in `.gitleaks.toml` (gitleaks rule's `paths` field) or add the rule's id under `paths.include` exclusions in `.semgrep-rules/dev-popper.yaml`.
+
 ---
 
 ## What Claude should do
