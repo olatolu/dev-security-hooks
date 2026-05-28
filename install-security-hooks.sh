@@ -200,9 +200,13 @@ repos:
         verbose: true
 
       # ---------- pre-push stage: upstream..HEAD diff, blocking ----------
+      # Fresh-branch fallback: when no upstream is tracked, scan only the diff
+      # against origin/HEAD (the remote default branch) — not full history.
+      # Scanning full history on a fresh-branch push trips on pre-existing
+      # historical findings the user didn't author, which forced --no-verify.
       - id: gitleaks-prepush
         name: gitleaks (upstream..HEAD)
-        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; set -e; range="@{upstream}..HEAD"; if ! git rev-parse "@{upstream}" >/dev/null 2>&1; then echo "no upstream tracked; scanning full history"; range=""; fi; gitleaks detect --source . ${range:+--log-opts="$range"} --redact --verbose'
+        entry: bash -c 'export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"; set -e; if git rev-parse "@{upstream}" >/dev/null 2>&1; then range="@{upstream}..HEAD"; elif default_ref=$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null); then range="${default_ref}..HEAD"; echo "no upstream tracked; scanning vs ${default_ref}"; else range="HEAD~1..HEAD"; echo "no upstream and no remote default; scanning HEAD~1..HEAD"; fi; gitleaks detect --source . --log-opts="$range" --redact --verbose'
         language: system
         pass_filenames: false
         always_run: true
@@ -285,6 +289,11 @@ paths = [
   '''(^|/)tests?/.*\.(json|ya?ml)$''',
   '''(^|/)docs/''',
   '''(^|/)attached_assets/''',
+  # The installer script (dropped into every consumer repo by
+  # dev-security-hooks) documents the dev-popper patterns it watches for, so
+  # it naturally matches its own rules. Exempt the installer itself; the
+  # rules still scan everywhere else.
+  '''(^|/)scripts/install-security-hooks\.sh$''',
 ]
 
 # ----- Custom malware-signature rules (DEV#POPPER family) -----

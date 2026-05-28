@@ -6,8 +6,8 @@ Two independent setups inside this repo — install one, both, or neither:
 
 | What | Why | Pinned URL |
 |---|---|---|
-| [Local pre-commit scanning](#1-local-pre-commit-scanning-gitleaks--semgrep) | Block secrets + ERROR-severity SAST findings before they leave your machine. | `v1.3.0` |
-| [GPG commit signing](#2-gpg-commit-signing) | Get the GitHub "Verified" badge on every commit; satisfies signed-commit branch protection. | `v1.3.0` |
+| [Local pre-commit scanning](#1-local-pre-commit-scanning-gitleaks--semgrep) | Block secrets + ERROR-severity SAST findings before they leave your machine. | `v1.3.1` |
+| [GPG commit signing](#2-gpg-commit-signing) | Get the GitHub "Verified" badge on every commit; satisfies signed-commit branch protection. | `v1.3.1` |
 
 ---
 
@@ -17,7 +17,7 @@ Two independent setups inside this repo — install one, both, or neither:
 
 ```bash
 mkdir -p scripts
-curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.0/install-security-hooks.sh \
+curl -fsSL https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.1/install-security-hooks.sh \
   -o scripts/install-security-hooks.sh
 chmod +x scripts/install-security-hooks.sh
 bash scripts/install-security-hooks.sh
@@ -41,7 +41,7 @@ Semgrep registry rules cover JavaScript, TypeScript, Node.js, NestJS, Next.js, F
 
 ### With Claude Code
 
-> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.0/setup-security-hooks.md to set up local security scanning here.
+> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.1/setup-security-hooks.md to set up local security scanning here.
 
 ### Manual commands once installed
 
@@ -64,7 +64,7 @@ For the GitHub **Verified** badge and to satisfy signed-commit branch protection
 
 Open Claude Code on your machine and say:
 
-> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.0/setup-gpg-signing.md to set up GPG commit signing.
+> Follow https://raw.githubusercontent.com/olatolu/dev-security-hooks/v1.3.1/setup-gpg-signing.md to set up GPG commit signing.
 
 Claude installs GnuPG + pinentry, configures gpg-agent for IDE-friendly passphrase prompts, walks you through key generation, writes the git config (asking whether you want it **global** or **scoped to a directory** — pick scoped if you commit as different identities for personal projects vs work), and helps you upload the public key to GitHub.
 
@@ -89,7 +89,7 @@ Read [`setup-gpg-signing.md`](./setup-gpg-signing.md) and follow the "What Claud
 
 ## Releases
 
-Pinned URLs use a git tag for tamper-resistance. Always reference the latest tag in the table at the top of this README. Current: **v1.3.0**.
+Pinned URLs use a git tag for tamper-resistance. Always reference the latest tag in the table at the top of this README. Current: **v1.3.1**.
 
 **Upgrading from an older version:** because the installer is idempotent and preserves existing configs, an in-place re-run won't pick up new rules. To upgrade, delete the locally-installed configs and re-run:
 
