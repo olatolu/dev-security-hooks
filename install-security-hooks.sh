@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
-# Bootstrap local pre-commit security scanning (Gitleaks + Semgrep).
+# Bootstrap local pre-commit security scanning (Gitleaks + Semgrep + YARA).
 # Works on macOS and Linux. Idempotent.
 #
 # Usage:  bash scripts/install-security-hooks.sh
 # Re-run any time: it preserves existing config files and re-installs hooks.
+#
+# NOTE: this installer is idempotent and PRESERVES existing local configs, so an
+# in-place re-run does NOT pick up new rules. To upgrade detection, delete the
+# local configs and re-run (see README "Upgrading").
+
+DEV_SECURITY_HOOKS_VERSION="1.4.0"
+# Changelog:
+#   1.4.0 - PolinRider variant-2 detection: marker Cot%3t=shtP, global['_V']
+#           version-tag + global['x']=require|module steal (gitleaks + semgrep);
+#           broadened long-line config-file glob. Intel: OpenSourceMalware/PolinRider.
+#   1.3.1 - gitleaks pre-push no-upstream fallback + installer allowlist
+#   1.3.0 - YARA community ruleset (signature-base) advisory layer
+#   1.2.1 - escape ERROR string in long-line hook (YAML parse fix)
 
 set -euo pipefail
 
@@ -182,7 +195,7 @@ repos:
         name: long-line check on config files (DEV#POPPER sniffer)
         entry: bash -c 'rc=0; for f in "$@"; do [ -f "$f" ] || continue; max=$(awk "{ if (length>max) max=length } END { print max+0 }" "$f"); if [ "$max" -gt 500 ]; then echo "[ERROR] $f has a $max-char line (limit 500). Config files should never have lines this long — possible malware payload (DEV#POPPER family)."; rc=1; fi; done; exit $rc' --
         language: system
-        files: '(^|/)([a-z][a-z0-9-]*\.)?config\.(js|mjs|cjs|ts)$|(^|/)(jest|postcss|tailwind|next|webpack|babel|rollup|vite|eslint|prettier)\.config\.[a-z]+$'
+        files: '(^|/)([a-z][a-z0-9-]*\.)?config\.(js|mjs|cjs|ts)$|(^|/)(jest|postcss|tailwind|next|webpack|babel|rollup|vite|eslint|prettier|gridsome|vue|astro|svelte|nuxt|remix)\.config\.[a-z]+$|(^|/)truffle\.js$'
         stages: [pre-commit]
 
       - id: semgrep-staged
@@ -323,6 +336,25 @@ id = "dev-popper-shuffler-iife"
 description = "DEV#POPPER malware loader: character-shuffler IIFE signature"
 regex = '''=\s*\(function\s*\(\s*l\s*,\s*e\s*\)\s*\{\s*var\s+\w+\s*=\s*l\.length'''
 keywords = ["function(l,e)"]
+
+# --- PolinRider variant markers (added v1.4.0; intel: OpenSourceMalware/PolinRider) ---
+[[rules]]
+id = "dev-popper-obfuscator-marker"
+description = "PolinRider/DEV#POPPER obfuscator marker string (variant rmcej%otb% or Cot%3t=shtP)"
+regex = '''rmcej%otb%|Cot%3t=shtP'''
+keywords = ["rmcej", "Cot%3t"]
+
+[[rules]]
+id = "dev-popper-global-require-steal"
+description = "PolinRider/DEV#POPPER loader: global['x'] = require|module capture (variant-agnostic)"
+regex = '''global\s*\[\s*['"][a-zA-Z_!]{1,3}['"]\s*\]\s*=\s*(require|module)\b'''
+keywords = ["global"]
+
+[[rules]]
+id = "dev-popper-global-version-tag"
+description = "PolinRider/DEV#POPPER loader (v2): global['_V']='<n>-<id>' version-tag pollution"
+regex = '''global\s*\[\s*['"]_V['"]\s*\]\s*=\s*['"][0-9]+-[a-z0-9]+['"]'''
+keywords = ["global"]
 GITLEAKS_EOF
 
 write_if_missing ".semgrep-rules/dev-popper.yaml" <<'SEMGREP_RULES_EOF'
@@ -377,6 +409,31 @@ rules:
         - "*.mjs"
         - "*.cjs"
         - "*.ts"
+
+  # --- PolinRider variant markers (added v1.4.0; intel: OpenSourceMalware/PolinRider) ---
+  - id: dev-popper-obfuscator-marker
+    languages: [generic]
+    message: "PolinRider/DEV#POPPER obfuscator marker (rmcej%otb% / Cot%3t=shtP)"
+    severity: ERROR
+    pattern-regex: 'rmcej%otb%|Cot%3t=shtP'
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts", "*.tsx", "*.json"]
+
+  - id: dev-popper-global-require-steal
+    languages: [generic]
+    message: "PolinRider/DEV#POPPER loader: global['x'] = require|module capture (variant-agnostic)"
+    severity: ERROR
+    pattern-regex: 'global\s*\[\s*[''"][a-zA-Z_!]{1,3}[''"]\s*\]\s*=\s*(require|module)\b'
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts"]
+
+  - id: dev-popper-global-version-tag
+    languages: [generic]
+    message: "PolinRider/DEV#POPPER loader (v2): global['_V']='<n>-<id>' version-tag pollution"
+    severity: ERROR
+    pattern-regex: 'global\s*\[\s*[''"]_V[''"]\s*\]\s*=\s*[''"][0-9]+-[a-z0-9]+[''"]'
+    paths:
+      include: ["*.js", "*.mjs", "*.cjs", "*.ts"]
 SEMGREP_RULES_EOF
 
 # ---------- YARA community ruleset (Florian Roth signature-base) ----------
